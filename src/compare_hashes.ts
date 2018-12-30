@@ -21,10 +21,25 @@ console.log(`${hashes2.length()} files after hash-unification in the second file
 
 const onlyInFile2 = hashes2.filterKeys(hash2 => !hashes1.containsKey(hash2));
 
+function getFolderName(fname: string) {
+    if (fname === "") {
+        return ""
+    }
+    return Vector.ofIterable(fname).dropRightWhile(c => c != '/').mkString("");
+}
+
 console.log(`${onlyInFile2.length()} files only in the second list`);
 
+const foldersAtLeastPartiallyHandled = Vector.ofIterable(
+    hashes2.filterKeys(hash => hashes1.containsKey(hash)).valueIterable())
+    .toSet(getFolderName);
+
 const foldersOnlyInFile2 = Vector.ofIterable(onlyInFile2.valueIterable())
-    .toSet(path => Vector.ofIterable(path).dropRightWhile(c => c != '/').mkString(""))
+    .toSet(getFolderName)
     .filter(f => !f.endsWith("/small/"));
-console.log(`${foldersOnlyInFile2.length()} folders with files only in the second list`);
-console.log(foldersOnlyInFile2.mkString("\n"))
+
+const foldersOfInterest = foldersOnlyInFile2.removeAll(foldersAtLeastPartiallyHandled);
+console.log(`${foldersOfInterest.length()} folders of interest`);
+// console.log(foldersOfInterest.mkString("\n"))
+
+console.log(`${onlyInFile2.filter((_,f)=>foldersOfInterest.contains(getFolderName(f))).length()} files in folders of interest`);

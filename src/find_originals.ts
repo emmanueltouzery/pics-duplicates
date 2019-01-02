@@ -51,7 +51,7 @@ for (const picasaPic of picasaPics) {
         const newFile = newFiles.head().getOrThrow();
         const oldSize = fs.statSync(oldFile).size;
         const newSize = fs.statSync(newFile).size;
-        if (newSize > oldSize) {
+        if (newSize >= oldSize) {
             fileToUse = newFile;
         } else {
             console.warn(`New file is smaller than original for ${picasaPic}`)

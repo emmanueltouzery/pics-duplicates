@@ -44,7 +44,7 @@ for (const picasaPic of picasaPics) {
     } else {
         let newFiles = allOldPicFiles.get(picasaPic).getOrThrow();
         if (newFiles.length() > 1) {
-            const result = spawnSync("compare-pics", newFiles.toArray());
+            const result = spawnSync("compare-pics", newFiles.prepend(oldFile).toArray());
             console.log(`user picked ${result.stdout.toString()}`)
             newFiles = Vector.of(result.stdout.toString().trim());
         }

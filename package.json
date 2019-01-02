@@ -1,0 +1,24 @@
+{
+  "name": "pics-duplicates",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "@types/node": "^10.12.18",
+    "prelude-ts": "/home/emmanuel/home/prelude.ts"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emmanueltouzery/pics-duplicates.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/emmanueltouzery/pics-duplicates/issues"
+  },
+  "homepage": "https://github.com/emmanueltouzery/pics-duplicates#readme"
+}

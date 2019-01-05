@@ -33,10 +33,8 @@ main = getArgs >>= \case
       putStrLn "parameters: <pictures folder> <hashes file>"
       exitFailure
 
-data ImageInfoType = ImageInfoReference | ImageInfoCandidate deriving (Eq, Show)
-
-imageInfo :: ImageInfoType -> (Path Abs File->IO ()) -> Path Abs File -> IO Gtk.VBox
-imageInfo imageInfoType imagePickedHandler path = do
+imageInfo :: (Path Abs File->IO ()) -> Path Abs File -> IO Gtk.VBox
+imageInfo imagePickedHandler path = do
   pixbuf <- Gdk.pixbufNewFromFile (toFilePath path)
   (pWidth, pHeight) <- (,) <$> Gtk.get pixbuf #width <*> Gtk.get pixbuf #height
   scaledPb <- fromJust <$> Gdk.pixbufScaleSimple pixbuf 150 150 Gdk.InterpTypeBilinear
@@ -46,12 +44,11 @@ imageInfo imageInfoType imagePickedHandler path = do
   box <- new Gtk.VBox []
   #add box image
 
-  when (imageInfoType == ImageInfoCandidate) $ do
-      let labelMsg = toFilePath (dirname (parent path)) <> " / "
-                     <> show pWidth <> "x" <> show pHeight
-      button <- new Gtk.Button [ #label := T.pack labelMsg ]
-      Gtk.on button #clicked (imagePickedHandler path)
-      #add box button
+  let folderName = T.dropEnd 1 $ T.pack $ toFilePath $ dirname $ parent path
+  let labelMsg = folderName <> " / " <> show pWidth <> "x" <> show pHeight
+  button <- new Gtk.Button [ #label := labelMsg ]
+  Gtk.on button #clicked (imagePickedHandler path)
+  #add box button
 
   pure box
 
@@ -74,10 +71,10 @@ addPage pageIndex pageCount win availableImages pic = do
 
   let imagePickedHandler imgPath = print (toFilePath imgPath) >> #nextPage win
 
-  #add grid =<< imageInfo ImageInfoReference imagePickedHandler pic
+  #add grid =<< imageInfo imagePickedHandler pic
   let candidates = Map.findWithDefault [] (filename pic) availableImages
   putStrLn $ "Found " <> show (length candidates) <> " candidates"
-  forM_ candidates (#add grid <=< imageInfo ImageInfoCandidate imagePickedHandler)
+  forM_ candidates (#add grid <=< imageInfo imagePickedHandler)
 
   vbox <- new Gtk.VBox []
   label <- new Gtk.Label [ #label := "<big><b>Image " <> show pageIndex

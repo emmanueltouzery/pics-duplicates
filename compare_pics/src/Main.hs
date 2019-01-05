@@ -35,8 +35,8 @@ main = getArgs >>= \case
 
 data ImageInfoType = ImageInfoReference | ImageInfoCandidate deriving (Eq, Show)
 
-imageInfo :: ImageInfoType -> Path a File -> IO Gtk.VBox
-imageInfo imageInfoType path = do
+imageInfo :: ImageInfoType -> (Path Abs File->IO ()) -> Path Abs File -> IO Gtk.VBox
+imageInfo imageInfoType imagePickedHandler path = do
   pixbuf <- Gdk.pixbufNewFromFile (toFilePath path)
   (pWidth, pHeight) <- (,) <$> Gtk.get pixbuf #width <*> Gtk.get pixbuf #height
   scaledPb <- fromJust <$> Gdk.pixbufScaleSimple pixbuf 150 150 Gdk.InterpTypeBilinear
@@ -50,10 +50,7 @@ imageInfo imageInfoType path = do
       let labelMsg = toFilePath (dirname (parent path)) <> " / "
                      <> show pWidth <> "x" <> show pHeight
       button <- new Gtk.Button [ #label := T.pack labelMsg ]
-      Gtk.on button #clicked $ do
-          Gtk.set button [ #sensitive := False]
-          putStrLn (toFilePath path)
-          exitSuccess
+      Gtk.on button #clicked (imagePickedHandler path)
       #add box button
 
   pure box
@@ -71,27 +68,39 @@ getAvailableImages hashFile = do
   pure $ foldr (\(k,v) sofar -> Map.insertWith (++) k [v] sofar) Map.empty pairs
 
 
-addPage :: Gtk.Assistant -> AvailableImages -> Path Abs File -> IO ()
-addPage win availableImages pic = do
+addPage :: Int -> Int -> Gtk.Assistant -> AvailableImages -> Path Abs File -> IO ()
+addPage pageIndex pageCount win availableImages pic = do
   grid <- new Gtk.Grid []
 
-  #add grid =<< imageInfo ImageInfoReference pic
-  let candidates = Map.findWithDefault [] (filename pic) availableImages
-  forM_ candidates (#add grid <=< imageInfo ImageInfoCandidate)
+  let imagePickedHandler imgPath = print (toFilePath imgPath) >> #nextPage win
 
-  void $ #appendPage win grid
+  #add grid =<< imageInfo ImageInfoReference imagePickedHandler pic
+  let candidates = Map.findWithDefault [] (filename pic) availableImages
+  putStrLn $ "Found " <> show (length candidates) <> " candidates"
+  forM_ candidates (#add grid <=< imageInfo ImageInfoCandidate imagePickedHandler)
+
+  vbox <- new Gtk.VBox []
+  label <- new Gtk.Label [ #label := "<big><b>Image " <> show pageIndex
+                                     <> "/" <> show pageCount <> "</b></big>"
+                         , #singleLineMode := True, #useMarkup := True ]
+  #packStart vbox label False False 0
+  #add vbox grid
+
+  void (#appendPage win vbox)
 
 handleImages :: Path Abs Dir -> Path Abs File -> IO ()
 handleImages imgFolder hashesFile = do
   pics <- snd <$> listDir imgFolder
   availableImages <- getAvailableImages hashesFile
+  putStrLn "loaded available images"
   
   Gtk.init Nothing
   -- win <- new Gtk.Window [ #title := "Hi there" ]
   win <- new Gtk.Assistant []
   Gtk.on win #destroy Gtk.mainQuit
 
-  forM_ pics (addPage win availableImages)
+  forM_ (zip pics [1..]) $ \(pic, idx) -> 
+    addPage idx (length pics) win availableImages pic
 
   #showAll win
   Gtk.main

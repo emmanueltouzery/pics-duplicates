@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, OverloadedLabels, LambdaCase, ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings, OverloadedLabels, LambdaCase #-}
 
 import Relude
 
@@ -58,7 +58,9 @@ imageInfo imageInfoType path = do
 
   pure box
 
-getAvailableImages :: Path Abs File -> IO (Map (Path Rel File) [Path Abs File])
+type AvailableImages = Map (Path Rel File) [Path Abs File]
+
+getAvailableImages :: Path Abs File -> IO AvailableImages
 getAvailableImages hashFile = do
   -- tailDef to remove the first file which has some meta-info
   fileLines <- tailDef [] . T.lines <$> T.readFile (toFilePath hashFile)
@@ -67,6 +69,17 @@ getAvailableImages hashFile = do
                <$> fileLines
   let pairs = map (\f -> (filename f, f)) filenames
   pure $ foldr (\(k,v) sofar -> Map.insertWith (++) k [v] sofar) Map.empty pairs
+
+
+addPage :: Gtk.Assistant -> AvailableImages -> Path Abs File -> IO ()
+addPage win availableImages pic = do
+  grid <- new Gtk.Grid []
+
+  #add grid =<< imageInfo ImageInfoReference pic
+  let candidates = Map.findWithDefault [] (filename pic) availableImages
+  forM_ candidates (#add grid <=< imageInfo ImageInfoCandidate)
+
+  void $ #appendPage win grid
 
 handleImages :: Path Abs Dir -> Path Abs File -> IO ()
 handleImages imgFolder hashesFile = do
@@ -78,17 +91,7 @@ handleImages imgFolder hashesFile = do
   win <- new Gtk.Assistant []
   Gtk.on win #destroy Gtk.mainQuit
 
-  grid <- new Gtk.Grid []
-
-  let pic = head $ fromJust $ nonEmpty pics
-  print $ filename pic
-
-  #add grid =<< imageInfo ImageInfoReference pic
-  let candidates = Map.findWithDefault [] (filename pic) availableImages
-  print candidates
-  forM_ candidates (#add grid <=< imageInfo ImageInfoCandidate)
-
-  #appendPage win grid
+  forM_ pics (addPage win availableImages)
 
   #showAll win
   Gtk.main

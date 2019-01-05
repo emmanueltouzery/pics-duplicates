@@ -28,7 +28,11 @@ main = getArgs >>= \case
     [picsFolder, hashesFile] -> do
       pics <- parseAbsDir =<< Dir.canonicalizePath picsFolder
       candidates <- parseAbsFile =<< Dir.canonicalizePath hashesFile
-      handleImages pics candidates
+      -- TODO confused as to why I can't compose a Path Abs Dir with a Path Rel File
+      -- same problem with resolve* lower down the file
+      targetDir <- resolveDir' $ toFilePath $ dirname pics
+      createDirIfMissing False targetDir
+      handleImages pics candidates targetDir
     _ -> do
       putStrLn "parameters: <pictures folder> <hashes file>"
       exitFailure
@@ -65,15 +69,17 @@ getAvailableImages hashFile = do
   pure $ foldr (\(k,v) sofar -> Map.insertWith (++) k [v] sofar) Map.empty pairs
 
 
-addPage :: Int -> Int -> Gtk.Assistant -> AvailableImages -> Path Abs File -> IO ()
-addPage pageIndex pageCount win availableImages pic = do
+addPage :: Int -> Int -> Gtk.Assistant -> AvailableImages -> Path Abs Dir -> Path Abs File -> IO ()
+addPage pageIndex pageCount win availableImages targetDir pic = do
   grid <- new Gtk.Grid []
 
-  let imagePickedHandler imgPath = print (toFilePath imgPath) >> #nextPage win
+  let imagePickedHandler imgPath = do
+        print (toFilePath imgPath)
+        copyFile imgPath =<< resolveFile targetDir (toFilePath $ filename pic)
+        #nextPage win
 
   #add grid =<< imageInfo imagePickedHandler pic
   let candidates = Map.findWithDefault [] (filename pic) availableImages
-  putStrLn $ "Found " <> show (length candidates) <> " candidates"
   forM_ candidates (#add grid <=< imageInfo imagePickedHandler)
 
   vbox <- new Gtk.VBox []
@@ -85,19 +91,17 @@ addPage pageIndex pageCount win availableImages pic = do
 
   void (#appendPage win vbox)
 
-handleImages :: Path Abs Dir -> Path Abs File -> IO ()
-handleImages imgFolder hashesFile = do
+handleImages :: Path Abs Dir -> Path Abs File -> Path Abs Dir -> IO ()
+handleImages imgFolder hashesFile targetDir = do
   pics <- snd <$> listDir imgFolder
   availableImages <- getAvailableImages hashesFile
-  putStrLn "loaded available images"
   
   Gtk.init Nothing
-  -- win <- new Gtk.Window [ #title := "Hi there" ]
   win <- new Gtk.Assistant []
   Gtk.on win #destroy Gtk.mainQuit
 
   forM_ (zip pics [1..]) $ \(pic, idx) -> 
-    addPage idx (length pics) win availableImages pic
+    addPage idx (length pics) win availableImages targetDir pic
 
   #showAll win
   Gtk.main

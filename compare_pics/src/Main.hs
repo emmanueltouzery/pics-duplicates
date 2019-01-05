@@ -28,9 +28,8 @@ main = getArgs >>= \case
     [picsFolder, hashesFile] -> do
       pics <- parseAbsDir =<< Dir.canonicalizePath picsFolder
       candidates <- parseAbsFile =<< Dir.canonicalizePath hashesFile
-      -- TODO confused as to why I can't compose a Path Abs Dir with a Path Rel File
-      -- same problem with resolve* lower down the file
-      targetDir <- resolveDir' $ toFilePath $ dirname pics
+      curDir <- getCurrentDir
+      let targetDir = curDir </> dirname pics
       createDirIfMissing False targetDir
       handleImages pics candidates targetDir
     _ -> do
@@ -78,7 +77,7 @@ addPage pageIndex pageCount win availableImages targetDir pic = do
 
   let imagePickedHandler imgPath = do
         print (toFilePath imgPath)
-        copyFile imgPath =<< resolveFile targetDir (toFilePath $ filename pic)
+        copyFile imgPath (targetDir </> filename pic)
         if pageIndex < pageCount
           then #nextPage win
           else exitSuccess

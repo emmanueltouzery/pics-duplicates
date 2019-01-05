@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings, OverloadedLabels, LambdaCase, ScopedTypeVariables #-}
 
+import Relude
+
 import System.Environment
-import System.Exit
 
 import Control.Monad
 import Data.Maybe
@@ -19,25 +20,25 @@ import Path.IO
 
 import qualified GI.Gtk as Gtk
 import qualified GI.GdkPixbuf as Gdk
-import Data.GI.Base
+import Data.GI.Base (new, AttrOp((:=)))
+import qualified Data.GI.Base as Gtk
 
 main :: IO ()
-main = do
-  getArgs >>= \case
+main = getArgs >>= \case
     [picsFolder, hashesFile] -> do
       pics <- parseAbsDir =<< Dir.canonicalizePath picsFolder
       candidates <- parseAbsFile =<< Dir.canonicalizePath hashesFile
       handleImages pics candidates
-    otherwise -> do
+    _ -> do
       putStrLn "parameters: <pictures folder> <hashes file>"
-      exitWith (ExitFailure 1)
+      exitFailure
 
 data ImageInfoType = ImageInfoReference | ImageInfoCandidate deriving (Eq, Show)
 
 imageInfo :: ImageInfoType -> Path a File -> IO Gtk.VBox
 imageInfo imageInfoType path = do
   pixbuf <- Gdk.pixbufNewFromFile (toFilePath path)
-  (pWidth, pHeight) <- (,) <$> get pixbuf #width <*> get pixbuf #height
+  (pWidth, pHeight) <- (,) <$> Gtk.get pixbuf #width <*> Gtk.get pixbuf #height
   scaledPb <- fromJust <$> Gdk.pixbufScaleSimple pixbuf 150 150 Gdk.InterpTypeBilinear
 
   image <- new Gtk.Image [ #pixbuf := scaledPb]
@@ -49,8 +50,8 @@ imageInfo imageInfoType path = do
       let labelMsg = toFilePath (dirname (parent path)) <> " / "
                      <> show pWidth <> "x" <> show pHeight
       button <- new Gtk.Button [ #label := T.pack labelMsg ]
-      on button #clicked $ do
-          set button [ #sensitive := False]
+      Gtk.on button #clicked $ do
+          Gtk.set button [ #sensitive := False]
           putStrLn (toFilePath path)
           exitSuccess
       #add box button
@@ -60,7 +61,7 @@ imageInfo imageInfoType path = do
 getAvailableImages :: Path Abs File -> IO (Map (Path Rel File) [Path Abs File])
 getAvailableImages hashFile = do
   -- tailDef to remove the first file which has some meta-info
-  fileLines <- tailDef [] <$> T.lines <$> T.readFile (toFilePath hashFile)
+  fileLines <- tailDef [] . T.lines <$> T.readFile (toFilePath hashFile)
   filenames <- traverse (parseAbsFile . T.unpack) $
                headDef ""  . T.splitOn "\t"
                <$> fileLines
@@ -75,11 +76,11 @@ handleImages imgFolder hashesFile = do
   Gtk.init Nothing
   -- win <- new Gtk.Window [ #title := "Hi there" ]
   win <- new Gtk.Assistant []
-  on win #destroy Gtk.mainQuit
+  Gtk.on win #destroy Gtk.mainQuit
 
   grid <- new Gtk.Grid []
 
-  let pic = head pics
+  let pic = head $ fromJust $ nonEmpty pics
   print $ filename pic
 
   #add grid =<< imageInfo ImageInfoReference pic

@@ -56,7 +56,10 @@ imageInfo imagePickedHandler path = do
 
   pure box
 
-type AvailableImages = Map (Path Rel File) [Path Abs File]
+type AvailableImages = Map Text [Path Abs File]
+
+hashFilename :: Path Rel File -> Text
+hashFilename = T.toLower . T.pack . toFilePath
 
 getAvailableImages :: Path Abs File -> IO AvailableImages
 getAvailableImages hashFile = do
@@ -65,7 +68,7 @@ getAvailableImages hashFile = do
   filenames <- traverse (parseAbsFile . T.unpack) $
                headDef ""  . T.splitOn "\t"
                <$> fileLines
-  let pairs = map (\f -> (filename f, f)) filenames
+  let pairs = map (\f -> (hashFilename $ filename f, f)) filenames
   pure $ foldr (\(k,v) sofar -> Map.insertWith (++) k [v] sofar) Map.empty pairs
 
 
@@ -76,10 +79,13 @@ addPage pageIndex pageCount win availableImages targetDir pic = do
   let imagePickedHandler imgPath = do
         print (toFilePath imgPath)
         copyFile imgPath =<< resolveFile targetDir (toFilePath $ filename pic)
-        #nextPage win
+        if pageIndex < pageCount
+          then #nextPage win
+          else exitSuccess
 
   #add grid =<< imageInfo imagePickedHandler pic
-  let candidates = Map.findWithDefault [] (filename pic) availableImages
+  let candidates = Map.findWithDefault [] (hashFilename $ filename pic) availableImages
+  putStrLn ("Found " <> show (length candidates) <> " candidates")
   forM_ candidates (#add grid <=< imageInfo imagePickedHandler)
 
   vbox <- new Gtk.VBox []

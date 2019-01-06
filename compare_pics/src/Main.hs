@@ -7,6 +7,7 @@ import System.Environment
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Text (Text)
+import Data.Maybe
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified System.Directory as Dir

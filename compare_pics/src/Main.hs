@@ -4,8 +4,6 @@ import Relude
 
 import System.Environment
 
-import Control.Monad
-import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Text (Text)
@@ -19,7 +17,6 @@ import Path.IO
 import qualified GI.Gtk as Gtk
 import qualified GI.GdkPixbuf as Gdk
 import Data.GI.Base (new, AttrOp((:=)))
-import qualified Data.GI.Base as Gtk
 
 main :: IO ()
 main = getArgs >>= \case

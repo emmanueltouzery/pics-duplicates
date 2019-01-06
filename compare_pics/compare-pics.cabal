@@ -23,7 +23,6 @@ executable compare-pics
                        , directory
                        , text
                        , containers
-                       , safe
                        , path
                        , path-io
                        , haskell-gi-base

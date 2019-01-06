@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, OverloadedLabels, LambdaCase #-}
+{-# LANGUAGE OverloadedStrings, OverloadedLabels, LambdaCase, NoMonomorphismRestriction #-}
 
 import Relude
 
@@ -12,8 +12,6 @@ import Data.Text (Text)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified System.Directory as Dir
-
-import Safe
 
 import Path
 import Path.IO
@@ -63,6 +61,9 @@ hashFilename = T.toLower . T.pack . toFilePath
 getAvailableImages :: Path Abs File -> IO AvailableImages
 getAvailableImages hashFile = do
   -- tailDef to remove the first file which has some meta-info
+  let nonEmptyOpDef op def = maybe def op . nonEmpty
+  let headDef = nonEmptyOpDef head
+  let tailDef = nonEmptyOpDef tail
   fileLines <- tailDef [] . T.lines <$> T.readFile (toFilePath hashFile)
   filenames <- traverse (parseAbsFile . T.unpack) $
                headDef ""  . T.splitOn "\t"

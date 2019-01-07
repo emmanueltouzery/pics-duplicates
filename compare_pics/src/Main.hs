@@ -36,9 +36,8 @@ main = getArgs >>= \case
 
 imageInfo :: (Path Abs File->IO ()) -> Path Abs File -> IO Gtk.VBox
 imageInfo imagePickedHandler path = do
-  pixbuf <- Gdk.pixbufNewFromFile (toFilePath path)
-  (pWidth, pHeight) <- (,) <$> Gtk.get pixbuf #width <*> Gtk.get pixbuf #height
-  scaledPb <- fromJust <$> Gdk.pixbufScaleSimple pixbuf 150 150 Gdk.InterpTypeBilinear
+  (_, pWidth, pHeight) <- Gdk.pixbufGetFileInfo (toFilePath path)
+  scaledPb <- Gdk.pixbufNewFromFileAtSize (toFilePath path) 150 150
 
   image <- new Gtk.Image [ #pixbuf := scaledPb]
 

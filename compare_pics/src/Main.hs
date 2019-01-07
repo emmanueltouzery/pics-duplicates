@@ -11,6 +11,8 @@ import Data.Maybe
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified System.Directory as Dir
+import qualified Data.Set as Set
+import System.FilePath.Posix (takeFileName)
 
 import Path
 import Path.IO
@@ -56,19 +58,19 @@ type AvailableImages = Map Text [Path Abs File]
 hashFilename :: Path Rel File -> Text
 hashFilename = T.toLower . T.pack . toFilePath
 
-getAvailableImages :: Path Abs File -> IO AvailableImages
-getAvailableImages hashFile = do
+getAvailableImages :: Path Abs File -> Set Text -> IO AvailableImages
+getAvailableImages hashFile picNamesToCheck = do
   -- tailDef to remove the first file which has some meta-info
   let nonEmptyOpDef op def = maybe def op . nonEmpty
   let headDef = nonEmptyOpDef head
   let tailDef = nonEmptyOpDef tail
   fileLines <- tailDef [] . T.lines <$> T.readFile (toFilePath hashFile)
-  filenames <- traverse (parseAbsFile . T.unpack) $
-               headDef ""  . T.splitOn "\t"
-               <$> fileLines
-  let pairs = map (\f -> (hashFilename $ filename f, f)) filenames
+  let filenames = headDef ""  . T.splitOn "\t" <$> fileLines
+  let fname pic = T.pack $ takeFileName $ T.unpack $ T.toLower pic
+  let filteredNames = filter (\k -> Set.member (fname k) picNamesToCheck) filenames
+  filteredFiles <- traverse (parseAbsFile . T.unpack) filteredNames
+  let pairs = map (\f -> (hashFilename $ filename f, f)) filteredFiles
   pure $ foldr (\(k,v) sofar -> Map.insertWith (++) k [v] sofar) Map.empty pairs
-
 
 addPage :: Int -> Int -> Gtk.Assistant -> AvailableImages -> Path Abs Dir -> Path Abs File -> IO ()
 addPage pageIndex pageCount win availableImages targetDir pic = do
@@ -98,7 +100,7 @@ addPage pageIndex pageCount win availableImages targetDir pic = do
 handleImages :: Path Abs Dir -> Path Abs File -> Path Abs Dir -> IO ()
 handleImages imgFolder hashesFile targetDir = do
   pics <- snd <$> listDir imgFolder
-  availableImages <- getAvailableImages hashesFile
+  availableImages <- getAvailableImages hashesFile (Set.fromList $ hashFilename . filename <$> pics)
   
   Gtk.init Nothing
   win <- new Gtk.Assistant []

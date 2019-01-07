@@ -22,6 +22,7 @@ executable compare-pics
   build-depends:       base >= 4.7 && < 5
                        , relude
                        , directory
+                       , filepath
                        , text
                        , containers
                        , path

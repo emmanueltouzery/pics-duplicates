@@ -7,12 +7,11 @@ import System.Environment
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Text (Text)
-import Data.Maybe
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified System.Directory as Dir
 import qualified Data.Set as Set
-import System.FilePath.Posix (takeFileName)
+import System.FilePath.Posix (takeFileName, takeExtension)
 
 import Path
 import Path.IO
@@ -106,7 +105,9 @@ handleImages imgFolder hashesFile targetDir = do
   Gtk.on win #destroy Gtk.mainQuit
 
   forM_ (zip pics [1..]) $ \(pic, idx) -> 
-    addPage idx (length pics) win availableImages targetDir pic
+    if (T.toLower . T.pack . takeExtension . toFilePath) pic `elem` [".avi", ".mp4", ".mov"]
+        then copyFile pic (targetDir </> filename pic)
+        else addPage idx (length pics) win availableImages targetDir pic
 
   #showAll win
   Gtk.main

@@ -12,6 +12,7 @@ import Data.Map (Map)
 import qualified System.Directory as Dir
 import qualified Data.Set as Set
 import System.FilePath.Posix (takeFileName)
+import Data.List (partition)
 
 import Path
 import Path.IO
@@ -104,10 +105,11 @@ handleImages imgFolder hashesFile targetDir = do
   win <- new Gtk.Assistant []
   Gtk.on win #destroy Gtk.mainQuit
 
-  forM_ (zip pics [1..]) $ \(pic, idx) -> 
-    if (T.toLower . T.pack . fileExtension) pic `elem` [".avi", ".mp4", ".mov"]
-        then copyFile pic (targetDir </> filename pic)
-        else addPage idx (length pics) win availableImages targetDir pic
+  let isVideo pic = (T.toLower . T.pack . fileExtension) pic `elem` [".avi", ".mp4", ".mov"]
+  let (videos, photos) = partition isVideo pics
+  forM_ videos $ \video -> copyFile video (targetDir </> filename video)
+  forM_ (zip photos [1..]) $ \(pic, idx) -> 
+        addPage idx (length photos) win availableImages targetDir pic
 
   #showAll win
   Gtk.main

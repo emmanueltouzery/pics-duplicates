@@ -1,9 +1,11 @@
-{-# LANGUAGE OverloadedStrings, OverloadedLabels, LambdaCase, NoMonomorphismRestriction #-}
+{-# LANGUAGE OverloadedStrings, OverloadedLabels,
+             LambdaCase, NoMonomorphismRestriction, TypeApplications #-}
 
 import Relude
 
 import System.Environment
 
+import Control.Exception
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Text (Text)
@@ -71,6 +73,14 @@ getAvailableImages hashFile picNamesToCheck = do
   let pairs = map (\f -> (hashFilename $ filename f, f)) filteredFiles
   pure $ foldr (\(k,v) sofar -> Map.insertWith (++) k [v] sofar) Map.empty pairs
 
+addImageInfo :: Gtk.Grid -> (Path Abs File->IO ()) -> Path Abs File -> IO ()
+addImageInfo grid imagePickedHandler pic =
+  -- shouldn't be catching SomeException.. IOException ain't enough though.
+  try @SomeException (imageInfo imagePickedHandler pic) >>= \case
+    Right info -> #add grid info
+    Left err -> error ("*** Error handling picture "
+                       <> show pic <> ": " <> show err)
+
 addPage :: Int -> Int -> Gtk.Assistant -> AvailableImages -> Path Abs Dir -> Path Abs File -> IO ()
 addPage pageIndex pageCount win availableImages targetDir pic = do
   grid <- new Gtk.Grid []
@@ -82,10 +92,10 @@ addPage pageIndex pageCount win availableImages targetDir pic = do
           then #nextPage win
           else exitSuccess
 
-  #add grid =<< imageInfo imagePickedHandler pic
+  addImageInfo grid imagePickedHandler pic
   let candidates = Map.findWithDefault [] (hashFilename $ filename pic) availableImages
   putStrLn ("Found " <> show (length candidates) <> " candidates")
-  forM_ candidates (#add grid <=< imageInfo imagePickedHandler)
+  forM_ candidates (addImageInfo grid imagePickedHandler)
 
   vbox <- new Gtk.VBox []
   label <- new Gtk.Label [ #label := "<big><b>Image " <> show pageIndex

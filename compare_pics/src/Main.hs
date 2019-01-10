@@ -11,7 +11,7 @@ import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified System.Directory as Dir
 import qualified Data.Set as Set
-import System.FilePath.Posix (takeFileName, takeExtension)
+import System.FilePath.Posix (takeFileName)
 
 import Path
 import Path.IO
@@ -104,9 +104,8 @@ handleImages imgFolder hashesFile targetDir = do
   win <- new Gtk.Assistant []
   Gtk.on win #destroy Gtk.mainQuit
 
-  let pathExtension = T.pack . takeExtension . toFilePath
   forM_ (zip pics [1..]) $ \(pic, idx) -> 
-    if T.toLower (pathExtension pic) `elem` [".avi", ".mp4", ".mov"]
+    if (T.toLower . T.pack . fileExtension) pic `elem` [".avi", ".mp4", ".mov"]
         then copyFile pic (targetDir </> filename pic)
         else addPage idx (length pics) win availableImages targetDir pic
 

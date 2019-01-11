@@ -6,6 +6,7 @@ import Relude
 import System.Environment
 
 import Control.Exception.Safe
+import System.Process
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Text (Text)
@@ -36,8 +37,8 @@ main = getArgs >>= \case
       putStrLn "parameters: <pictures folder> <hashes file>"
       exitFailure
 
-imageInfo :: (Path Abs File->IO ()) -> Path Abs File -> IO Gtk.VBox
-imageInfo imagePickedHandler path = do
+imageInfo :: Path Abs File -> (Path Abs File->IO (Path Abs File)) -> Path Abs File -> IO Gtk.VBox
+imageInfo origPic imagePickedHandler path = do
   (_, pWidth, pHeight) <- Gdk.pixbufGetFileInfo (toFilePath path)
   scaledPb <- Gdk.pixbufNewFromFileAtSize (toFilePath path) 150 150
 
@@ -46,11 +47,20 @@ imageInfo imagePickedHandler path = do
   box <- new Gtk.VBox []
   #add box image
 
+  buttons <- new Gtk.HBox []
+  #add box buttons
+
   let folderName = T.dropEnd 1 $ T.pack $ toFilePath $ dirname $ parent path
   let labelMsg = folderName <> " / " <> show pWidth <> "x" <> show pHeight
   button <- new Gtk.Button [ #label := labelMsg ]
-  Gtk.on button #clicked (imagePickedHandler path)
-  #add box button
+  Gtk.on button #clicked (void $ imagePickedHandler path)
+  #add buttons button
+
+  editBtn <- new Gtk.Button [ #label := "🎨" ]
+  Gtk.on editBtn #clicked (void $ imagePickedHandler path >>=
+                           spawnCommand . (\f -> "gimp \"" <> toFilePath origPic
+                                            <> "\" \"" <> toFilePath f <> "\""))
+  #add buttons editBtn
 
   pure box
 
@@ -73,9 +83,9 @@ getAvailableImages hashFile picNamesToCheck = do
   let pairs = map (\f -> (hashFilename $ filename f, f)) filteredFiles
   pure $ foldr (\(k,v) sofar -> Map.insertWith (++) k [v] sofar) Map.empty pairs
 
-addImageInfo :: Gtk.Grid -> (Path Abs File->IO ()) -> Path Abs File -> IO ()
-addImageInfo grid imagePickedHandler pic =
-  tryAny (imageInfo imagePickedHandler pic) >>= \case
+addImageInfo :: Path Abs File -> Gtk.Grid -> (Path Abs File->IO (Path Abs File)) -> Path Abs File -> IO ()
+addImageInfo origPic grid imagePickedHandler pic =
+  tryAny (imageInfo origPic imagePickedHandler pic) >>= \case
     Right info -> #add grid info
     Left err -> error ("*** Error handling picture "
                        <> show pic <> ": " <> show err)
@@ -86,15 +96,22 @@ addPage pageIndex pageCount win availableImages targetDir pic = do
 
   let imagePickedHandler imgPath = do
         print (toFilePath imgPath)
-        copyFile imgPath (targetDir </> filename pic)
+        let targetFile = targetDir </> filename pic
+        copyFile imgPath targetFile
         if pageIndex < pageCount
           then #nextPage win
-          else exitSuccess
+          else do
+              dlg <- new Gtk.MessageDialog [#useHeaderBar := 1
+                                           , #buttons := Gtk.ButtonsTypeClose
+                                           , #text := "Done!" ]
+              Gtk.dialogRun dlg
+              void (Gtk.widgetDestroy dlg)
+        pure targetFile
 
-  addImageInfo grid imagePickedHandler pic
+  addImageInfo pic grid imagePickedHandler pic
   let candidates = Map.findWithDefault [] (hashFilename $ filename pic) availableImages
   putStrLn ("Found " <> show (length candidates) <> " candidates")
-  forM_ candidates (addImageInfo grid imagePickedHandler)
+  forM_ candidates (addImageInfo pic grid imagePickedHandler)
 
   vbox <- new Gtk.VBox []
   label <- new Gtk.Label [ #label := "<big><b>Image " <> show pageIndex

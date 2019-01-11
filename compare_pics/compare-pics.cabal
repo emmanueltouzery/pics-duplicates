@@ -26,6 +26,7 @@ executable compare-pics
                        , safe-exceptions
                        , text
                        , containers
+                       , process
                        , path
                        , path-io
                        , haskell-gi-base

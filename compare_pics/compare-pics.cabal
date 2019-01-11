@@ -23,6 +23,7 @@ executable compare-pics
                        , relude
                        , directory
                        , filepath
+                       , safe-exceptions
                        , text
                        , containers
                        , path

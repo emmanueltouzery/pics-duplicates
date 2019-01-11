@@ -5,7 +5,7 @@ import Relude
 
 import System.Environment
 
-import Control.Exception
+import Control.Exception.Safe
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Text (Text)
@@ -75,8 +75,7 @@ getAvailableImages hashFile picNamesToCheck = do
 
 addImageInfo :: Gtk.Grid -> (Path Abs File->IO ()) -> Path Abs File -> IO ()
 addImageInfo grid imagePickedHandler pic =
-  -- shouldn't be catching SomeException.. IOException ain't enough though.
-  try @SomeException (imageInfo imagePickedHandler pic) >>= \case
+  tryAny (imageInfo imagePickedHandler pic) >>= \case
     Right info -> #add grid info
     Left err -> error ("*** Error handling picture "
                        <> show pic <> ": " <> show err)

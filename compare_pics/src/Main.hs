@@ -160,7 +160,7 @@ handleImages imgFolder hashesFile targetDir = do
     pure btn
   #addActionWidget win closeBtn
 
-  let isVideo pic = (T.toLower . T.pack . fileExtension) pic `elem` [".avi", ".mp4", ".mov"]
+  let isVideo pic = (T.toLower . T.pack . fileExtension) pic `elem` [".avi", ".mp4", ".mov", "3gp"]
   let (videos, photos) = partition isVideo pics
   forM_ videos $ \video -> copyFile video (targetDir </> filename video)
   forM_ (zip photos [1..]) $ \(pic, idx) -> 

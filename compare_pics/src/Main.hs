@@ -83,29 +83,31 @@ getAvailableImages hashFile picNamesToCheck = do
   let pairs = map (\f -> (hashFilename $ filename f, f)) filteredFiles
   pure $ foldr (\(k,v) sofar -> Map.insertWith (++) k [v] sofar) Map.empty pairs
 
-addImageInfo :: Path Abs File -> Gtk.FlowBox -> (Path Abs File->IO (Path Abs File)) -> Path Abs File -> IO ()
+addImageInfo :: Path Abs File -> Gtk.FlowBox
+             -> (Path Abs File->IO (Path Abs File)) -> Path Abs File -> IO ()
 addImageInfo origPic grid imagePickedHandler pic =
   tryAny (imageInfo origPic imagePickedHandler pic) >>= \case
     Right info -> #add grid info
     Left err -> error ("*** Error handling picture "
                        <> show pic <> ": " <> show err)
 
-addPage :: Int -> Int -> Gtk.Assistant -> AvailableImages -> Path Abs Dir -> Path Abs File -> IO ()
-addPage pageIndex pageCount win availableImages targetDir pic = do
+addPage :: Int -> Int -> Gtk.Assistant -> Gtk.Button -> AvailableImages -> Path Abs Dir -> Path Abs File -> IO ()
+addPage pageIndex pageCount win closeBtn availableImages targetDir pic = do
   grid <- new Gtk.FlowBox []
 
   let imagePickedHandler imgPath = do
-        print (toFilePath imgPath)
         let targetFile = targetDir </> filename pic
         copyFile imgPath targetFile
         if pageIndex < pageCount
           then #nextPage win
           else do
-              dlg <- new Gtk.MessageDialog [#useHeaderBar := 1
-                                           , #buttons := Gtk.ButtonsTypeClose
-                                           , #text := "Done!" ]
-              Gtk.dialogRun dlg
-              void (Gtk.widgetDestroy dlg)
+            dlg <- new Gtk.MessageDialog [#useHeaderBar := 1
+                                         , #buttons := Gtk.ButtonsTypeClose
+                                         , #text := "Done!" ]
+            Gtk.dialogRun dlg
+            Gtk.widgetDestroy dlg
+            Gtk.set closeBtn [ #sensitive := True ]
+
         pure targetFile
 
   addImageInfo pic grid imagePickedHandler pic
@@ -123,7 +125,8 @@ addPage pageIndex pageCount win availableImages targetDir pic = do
   scrolledWindow <- new Gtk.ScrolledWindow []
   #add scrolledWindow vbox
 
-  void (#appendPage win scrolledWindow)
+  #appendPage win scrolledWindow
+  #setPageType win scrolledWindow Gtk.AssistantPageTypeCustom
 
 handleImages :: Path Abs Dir -> Path Abs File -> Path Abs Dir -> IO ()
 handleImages imgFolder hashesFile targetDir = do
@@ -134,11 +137,17 @@ handleImages imgFolder hashesFile targetDir = do
   win <- new Gtk.Assistant []
   Gtk.on win #destroy Gtk.mainQuit
 
+  closeBtn <- do
+    btn <- new Gtk.Button [ #label := "Close", #sensitive := False ]
+    Gtk.on btn #clicked exitSuccess
+    pure btn
+  #addActionWidget win closeBtn
+
   let isVideo pic = (T.toLower . T.pack . fileExtension) pic `elem` [".avi", ".mp4", ".mov"]
   let (videos, photos) = partition isVideo pics
   forM_ videos $ \video -> copyFile video (targetDir </> filename video)
   forM_ (zip photos [1..]) $ \(pic, idx) -> 
-        addPage idx (length photos) win availableImages targetDir pic
+        addPage idx (length photos) win closeBtn availableImages targetDir pic
 
   #showAll win
   Gtk.main

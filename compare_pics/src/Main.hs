@@ -37,12 +37,27 @@ main = getArgs >>= \case
       putStrLn "parameters: <pictures folder> <hashes file>"
       exitFailure
 
-imageInfo :: Path Abs File -> (Path Abs File->IO (Path Abs File)) -> Path Abs File -> IO Gtk.VBox
+imageInfo :: Path Abs File -> (Path Abs File->IO (Path Abs File))
+          -> Path Abs File -> IO Gtk.VBox
 imageInfo origPic imagePickedHandler path = do
   (_, pWidth, pHeight) <- Gdk.pixbufGetFileInfo (toFilePath path)
   scaledPb <- Gdk.pixbufNewFromFileAtSize (toFilePath path) 150 150
 
-  image <- new Gtk.Image [ #pixbuf := scaledPb]
+  -- scaledPb is not 150x150 but 150x100 or 100x150 or whatever,
+  -- depending on the picture aspect ratio. That means the picture
+  -- height will be different on different screens, which is annoying.
+  -- create a new pixbuf of 150x150 and copy the one I got in that
+  -- one so I always have the same size.
+  colorspace <- Gdk.pixbufGetColorspace scaledPb
+  bits <- Gdk.get scaledPb #bitsPerSample
+  Just squarePb <- Gdk.pixbufNew colorspace True bits 150 150
+  Gdk.pixbufFill squarePb 0x00000000
+  w <- Gdk.pixbufGetWidth scaledPb
+  h <- Gdk.pixbufGetHeight scaledPb
+  Gdk.pixbufCopyArea scaledPb 0 0
+    w h squarePb ((150 - w) `div` 2) ((150 - h) `div` 2)
+
+  image <- new Gtk.Image [ #pixbuf := squarePb ]
 
   box <- new Gtk.VBox []
   #packStart box image False False 0
@@ -91,7 +106,8 @@ addImageInfo origPic grid imagePickedHandler pic =
     Left err -> error ("*** Error handling picture "
                        <> show pic <> ": " <> show err)
 
-addPage :: Int -> Int -> Gtk.Assistant -> Gtk.Button -> AvailableImages -> Path Abs Dir -> Path Abs File -> IO ()
+addPage :: Int -> Int -> Gtk.Assistant -> Gtk.Button -> AvailableImages
+        -> Path Abs Dir -> Path Abs File -> IO ()
 addPage pageIndex pageCount win closeBtn availableImages targetDir pic = do
   grid <- new Gtk.FlowBox []
 
@@ -101,7 +117,7 @@ addPage pageIndex pageCount win closeBtn availableImages targetDir pic = do
         if pageIndex < pageCount
           then #nextPage win
           else do
-            dlg <- new Gtk.MessageDialog [#useHeaderBar := 1
+            dlg <- new Gtk.MessageDialog [ #useHeaderBar := 1
                                          , #buttons := Gtk.ButtonsTypeClose
                                          , #text := "Done!" ]
             Gtk.dialogRun dlg
@@ -131,7 +147,8 @@ addPage pageIndex pageCount win closeBtn availableImages targetDir pic = do
 handleImages :: Path Abs Dir -> Path Abs File -> Path Abs Dir -> IO ()
 handleImages imgFolder hashesFile targetDir = do
   pics <- snd <$> listDir imgFolder
-  availableImages <- getAvailableImages hashesFile (Set.fromList $ hashFilename . filename <$> pics)
+  availableImages <- getAvailableImages hashesFile
+                       (Set.fromList $ hashFilename . filename <$> pics)
   
   Gtk.init Nothing
   win <- new Gtk.Assistant []

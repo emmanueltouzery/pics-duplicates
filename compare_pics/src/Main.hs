@@ -45,10 +45,10 @@ imageInfo origPic imagePickedHandler path = do
   image <- new Gtk.Image [ #pixbuf := scaledPb]
 
   box <- new Gtk.VBox []
-  #add box image
+  #packStart box image False False 0
 
   buttons <- new Gtk.HBox []
-  #add box buttons
+  #packStart box buttons False False 0
 
   let folderName = T.dropEnd 1 $ T.pack $ toFilePath $ dirname $ parent path
   let labelMsg = folderName <> " / " <> show pWidth <> "x" <> show pHeight
@@ -83,7 +83,7 @@ getAvailableImages hashFile picNamesToCheck = do
   let pairs = map (\f -> (hashFilename $ filename f, f)) filteredFiles
   pure $ foldr (\(k,v) sofar -> Map.insertWith (++) k [v] sofar) Map.empty pairs
 
-addImageInfo :: Path Abs File -> Gtk.Grid -> (Path Abs File->IO (Path Abs File)) -> Path Abs File -> IO ()
+addImageInfo :: Path Abs File -> Gtk.FlowBox -> (Path Abs File->IO (Path Abs File)) -> Path Abs File -> IO ()
 addImageInfo origPic grid imagePickedHandler pic =
   tryAny (imageInfo origPic imagePickedHandler pic) >>= \case
     Right info -> #add grid info
@@ -92,7 +92,7 @@ addImageInfo origPic grid imagePickedHandler pic =
 
 addPage :: Int -> Int -> Gtk.Assistant -> AvailableImages -> Path Abs Dir -> Path Abs File -> IO ()
 addPage pageIndex pageCount win availableImages targetDir pic = do
-  grid <- new Gtk.Grid []
+  grid <- new Gtk.FlowBox []
 
   let imagePickedHandler imgPath = do
         print (toFilePath imgPath)
@@ -118,9 +118,12 @@ addPage pageIndex pageCount win availableImages targetDir pic = do
                                      <> "/" <> show pageCount <> "</b></big>"
                          , #singleLineMode := True, #useMarkup := True ]
   #packStart vbox label False False 0
-  #add vbox grid
+  #packStart vbox grid False False 0
 
-  void (#appendPage win vbox)
+  scrolledWindow <- new Gtk.ScrolledWindow []
+  #add scrolledWindow vbox
+
+  void (#appendPage win scrolledWindow)
 
 handleImages :: Path Abs Dir -> Path Abs File -> Path Abs Dir -> IO ()
 handleImages imgFolder hashesFile targetDir = do

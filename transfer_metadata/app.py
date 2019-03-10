@@ -10,7 +10,7 @@ with open('picasa.json') as f:
 with open('flickr.json') as f:
     flickrSets = json.load(f)
 
-flickr_api.set_keys("xxx", "xxx")
+flickr_api.set_keys("XXX", "XXXX")
 flickr_api.set_auth_handler("my_access.txt")
 user = flickr_api.test.login()
 
@@ -25,8 +25,12 @@ user = flickr_api.test.login()
 # for curSet in sets:
 #  print json.dumps({ 'set': curSet, 'photos': curSet.getPhotos(), 'info': curSet.getInfo()}, default=lambda x: x.__dict__)
 
-picasaTitle = picasaAlbums[0]["title"]
-picasaId = picasaAlbums[0]["id"]
+print "%d picasa albums" % len(picasaAlbums)
+
+albumIdx = 9
+
+picasaTitle = picasaAlbums[albumIdx]["title"]
+picasaId = picasaAlbums[albumIdx]["id"]
 print "Dealing with picasa album %s [%s]" % (picasaTitle, picasaId)
 picasaContents = filter(lambda x: x['albumId'] ==  picasaId, picasaData)[0]
 picasaPics = picasaContents['data']['photos']
@@ -47,26 +51,44 @@ picked = input("Pick the album: ")
 pickedSet = flickrCandidates[int(picked)-1]
 print "Picked %s" % (pickedSet['info']['title'])
 
+sets = user.getPhotosets()
+set = filter(lambda x: x['id'] == pickedSet['info']['id'], sets)[0]
+flickrPhotos = set.getPhotos()
+
 picasaToFlickr = {}
+videos = []
+idx=0
 for flickrPic in pickedSet['photos']['data']:
     title = flickrPic['title']
-    picasaPic = filter(lambda x: x['filename'] == title + ".jpg", picasaPics)[0]
-    picasaToFlickr[picasaPic['id']] = flickrPic['id']
+    picasaPicCandidates = filter(lambda x: x['filename'].lower() == (title + ".jpg").lower(), picasaPics)
+    if len(picasaPicCandidates) != 1:
+        allOptions = ", ".join(map(lambda x: x['filename'], picasaPics))
+        print "Can't find picasa candidates for " + title + " all options: " + allOptions + " " + str(idx)
+        # print flickrPic
+        flickrPicObj = filter(lambda p: p.id == flickrPic["id"], flickrPhotos)[0]
+        flickrPicInfo = flickrPicObj.getInfo()
+        if flickrPicInfo["media"] == "video":
+            print "it's a video!!"
+            videos.append(flickrPic['id'])
+    if flickrPic['id'] not in videos:
+        picasaPic = picasaPicCandidates[0]
+        picasaToFlickr[picasaPic['id']] = flickrPic['id']
+    idx += 1
 
 newPhotosOrder = map(lambda x: picasaToFlickr[x['id']], picasaPics)
 
-sets = user.getPhotosets()
-set = filter(lambda x: x['id'] == pickedSet['info']['id'], sets)[0]
-# print "Reordering pics..."
-# set.reorderPhotos(photo_ids = newPhotosOrder)
-# print "Reordered!"
+print "Reordering pics..."
+set.reorderPhotos(photo_ids = newPhotosOrder)
+print "Reordered!"
 
-flickrPhotos = set.getPhotos()
-
-flickrCoverPhoto = picasaToFlickr[picasaAlbums[0]['coverPhotoMediaItemId']]
-primaryPhoto = filter(lambda p: p.id == flickrCoverPhoto, flickrPhotos)[0]
-print "flickr cover photo: %s" % primaryPhoto
-set.setPrimaryPhoto(photo = primaryPhoto)
+picasaCover = picasaAlbums[albumIdx]['coverPhotoMediaItemId']
+if picasaCover not in map(lambda x: x['id'], picasaPics):
+    print "Cover picture is not in the list (probably a video), skipping it"
+else:
+    flickrCoverPhoto = picasaToFlickr[picasaCover]
+    primaryPhoto = filter(lambda p: p.id == flickrCoverPhoto, flickrPhotos)[0]
+    print "flickr cover photo: %s" % primaryPhoto
+    set.setPrimaryPhoto(photo = primaryPhoto)
 
 for picasaPic in filter(lambda p: 'description' in p, picasaPics):
     print picasaPic['id']
